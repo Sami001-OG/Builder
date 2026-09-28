@@ -1,0 +1,36 @@
+{
+  "name": "builder-local",
+  "version": "0.1.0",
+  "description": "Local-first AI-powered web application builder — CLI + local runtime + browser IDE",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "builder": "dist/bundle.js",
+    "builder-local": "dist/bundle.js"
+  },
+  "exports": {
+    ".": "./dist/bundle.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "web-dist",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai",
+    "web-builder",
+    "local-first",
+    "cli",
+    "code-generator"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sami001-OG/Builder.git",
+    "directory": "packages/builder-local"
+  },
+  "homepage": "https://github.com/Sami001-OG/Builder#readme"
+}

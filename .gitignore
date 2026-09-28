@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# builder-local is a publishable bundled package — keep its dist bundle
+!packages/builder-local/dist/
 coverage/
 *.tsbuildinfo
 .turbo/

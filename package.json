@@ -16,6 +16,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:packages": "node scripts/build-packages.mjs",
+    "build:builder-local": "node scripts/bundle-builder-local.mjs",
     "test": "npm run test --workspaces --if-present",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "dev": "node scripts/dev.mjs",
