@@ -9,6 +9,134 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// node_modules/@builder/shared/dist/index.js
+function redact(value) {
+  if (typeof value === "string") {
+    if (value.length > 24 && /sk-|ghp_|gho_|xoxb-|Bearer/i.test(value))
+      return "[REDACTED]";
+    return value;
+  }
+  if (Array.isArray(value))
+    return value.map(redact);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = SECRET_KEYS.some((r) => r.test(k)) ? "[REDACTED]" : redact(v);
+    }
+    return out;
+  }
+  return value;
+}
+function createLogger(scope, level = "info") {
+  const order = ["debug", "info", "warn", "error"];
+  const enabled = (l) => order.indexOf(l) >= order.indexOf(level);
+  const emit = (l, msg, fields) => {
+    if (!enabled(l))
+      return;
+    const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), level: l, scope, msg, ...fields ? { fields: redact(fields) } : {} });
+    if (l === "error" || l === "warn")
+      console.error(line);
+    else
+      console.log(line);
+  };
+  return {
+    debug: (m, f) => emit("debug", m, f),
+    info: (m, f) => emit("info", m, f),
+    warn: (m, f) => emit("warn", m, f),
+    error: (m, f) => emit("error", m, f)
+  };
+}
+function uid(prefix = "id") {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+var BuilderError, SECRET_KEYS;
+var init_dist = __esm({
+  "node_modules/@builder/shared/dist/index.js"() {
+    BuilderError = class extends Error {
+      code;
+      details;
+      constructor(code, message, details) {
+        super(message);
+        this.name = "BuilderError";
+        this.code = code;
+        this.details = details;
+      }
+      toJSON() {
+        return { name: this.name, code: this.code, message: this.message };
+      }
+    };
+    SECRET_KEYS = [/api[_-]?key/i, /secret/i, /token/i, /password/i, /private[_-]?key/i, /authorization/i, /cookie/i, /set-cookie/i];
+  }
+});
+
+// node_modules/@builder/config/dist/index.js
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+function configDir() {
+  return path.join(os.homedir(), ".builder");
+}
+function configPath() {
+  return path.join(configDir(), "config.json");
+}
+function loadConfig(overrides = {}) {
+  let file = {};
+  try {
+    const raw = fs.readFileSync(configPath(), "utf8");
+    file = JSON.parse(raw);
+  } catch {
+  }
+  const env = {};
+  if (process.env.BUILDER_PORT)
+    env.serverPort = Number(process.env.BUILDER_PORT);
+  if (process.env.BUILDER_PROVIDER)
+    env.provider = process.env.BUILDER_PROVIDER;
+  if (process.env.BUILDER_MODEL)
+    env.model = process.env.BUILDER_MODEL;
+  const merged = { ...DEFAULTS, ...file, ...env, ...overrides };
+  validateConfig(merged);
+  return merged;
+}
+function validateConfig(c) {
+  if (!Number.isInteger(c.serverPort) || c.serverPort < 1024 || c.serverPort > 65535) {
+    throw new BuilderError("VALIDATION_ERROR", `Invalid serverPort: ${c.serverPort}`);
+  }
+  if (!["strict", "moderate", "permissive"].includes(c.approvals)) {
+    throw new BuilderError("VALIDATION_ERROR", `Invalid approvals policy: ${c.approvals}`);
+  }
+  if (!c.model || typeof c.model !== "string")
+    throw new BuilderError("VALIDATION_ERROR", "model must be a non-empty string");
+  if (!c.provider || typeof c.provider !== "string")
+    throw new BuilderError("VALIDATION_ERROR", "provider must be a non-empty string");
+  if (c.agent.maxIterations < 1 || c.agent.maxIterations > 500)
+    throw new BuilderError("VALIDATION_ERROR", "agent.maxIterations out of range");
+}
+function saveConfig(c) {
+  validateConfig(c);
+  fs.mkdirSync(configDir(), { recursive: true });
+  const { ...safe } = c;
+  fs.writeFileSync(configPath(), JSON.stringify(safe, null, 2) + "\n", { mode: 384 });
+}
+var DEFAULTS;
+var init_dist2 = __esm({
+  "node_modules/@builder/config/dist/index.js"() {
+    init_dist();
+    DEFAULTS = {
+      provider: "ollama",
+      model: "llama3.1",
+      baseUrl: "http://127.0.0.1:11434",
+      serverPort: 4173,
+      host: "127.0.0.1",
+      exposeLan: false,
+      theme: "system",
+      openBrowser: true,
+      approvals: "moderate",
+      previewBehavior: "auto",
+      agent: { maxIterations: 40, maxToolCalls: 120, commandTimeoutMs: 12e4, runTimeoutMs: 9e5, retryLimit: 5 }
+    };
+  }
+});
+
 // node_modules/@builder/permissions/dist/index.js
 var dist_exports = {};
 __export(dist_exports, {
@@ -56,7 +184,7 @@ function validateCommand(command, args, cwd, root) {
   return { ok: true };
 }
 var TOOL_LEVELS, DANGEROUS;
-var init_dist = __esm({
+var init_dist3 = __esm({
   "node_modules/@builder/permissions/dist/index.js"() {
     TOOL_LEVELS = {
       read_file: "SAFE",
@@ -142,7 +270,7 @@ function dec(stored) {
   return Buffer.concat([decipher.update(Buffer.from(dataB, "base64")), decipher.final()]).toString("utf8");
 }
 var fileCredentialStore;
-var init_dist2 = __esm({
+var init_dist4 = __esm({
   "node_modules/@builder/credentials/dist/index.js"() {
     fileCredentialStore = {
       async set(provider, key, value) {
@@ -179,143 +307,286 @@ var init_dist2 = __esm({
   }
 });
 
-// apps/cli/dist/index.js
+// apps/cli/dist/tui.js
+var tui_exports = {};
+__export(tui_exports, {
+  PROVIDERS: () => PROVIDERS,
+  isFirstRun: () => isFirstRun,
+  isInteractive: () => isInteractive,
+  parseChoice: () => parseChoice,
+  parsePort: () => parsePort,
+  runMainMenu: () => runMainMenu,
+  runSetupWizard: () => runSetupWizard
+});
 import fs5 from "node:fs";
+import readline from "node:readline";
+function isInteractive() {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env.CI;
+}
+function isFirstRun(cfg) {
+  try {
+    if (!fs5.existsSync(configPath()))
+      return true;
+  } catch {
+    return true;
+  }
+  if (cfg.provider === "ollama" && cfg.model === "llama3.1") {
+    if (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)
+      return false;
+    return true;
+  }
+  return false;
+}
+function parseChoice(input, max) {
+  const n = Number(input.trim());
+  if (!Number.isInteger(n) || n < 1 || n > max)
+    return null;
+  return n;
+}
+function parsePort(input, fallback) {
+  const t = input.trim();
+  if (t === "")
+    return fallback;
+  const n = Number(t);
+  if (!Number.isInteger(n) || n < 1024 || n > 65535)
+    return null;
+  return n;
+}
+function ask(rl, q) {
+  return new Promise((resolve) => rl.question(q, resolve));
+}
+async function askChoice(rl, q, max) {
+  for (; ; ) {
+    const n = parseChoice(await ask(rl, q), max);
+    if (n !== null)
+      return n;
+    console.log(`  Enter a number 1-${max}.`);
+  }
+}
+function askSecret(prompt) {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+    stdout.write(prompt);
+    let buf = "";
+    const wasRaw = stdin.isTTY ? stdin.isRaw : void 0;
+    const cleanup = () => {
+      stdin.removeListener("data", onData);
+      if (stdin.isTTY) {
+        try {
+          stdin.setRawMode(false);
+        } catch {
+        }
+        void wasRaw;
+      }
+      stdout.write("\n");
+    };
+    const onData = (d) => {
+      const s = d.toString("utf8");
+      if (s === "\r" || s === "\n" || s === "") {
+        cleanup();
+        stdin.pause();
+        resolve(buf);
+        return;
+      }
+      if (s === "") {
+        cleanup();
+        process.exit(130);
+      }
+      if (s === "\x7F" || s === "\b") {
+        buf = buf.slice(0, -1);
+        return;
+      }
+      buf += s.replace(/[\r\n]/g, "");
+    };
+    if (stdin.isTTY) {
+      try {
+        stdin.setRawMode(true);
+      } catch {
+      }
+      stdin.resume();
+      stdin.on("data", onData);
+    } else {
+      const rl = readline.createInterface({ input: stdin, output: stdout });
+      rl.question("", (ans) => {
+        rl.close();
+        resolve(ans.trim());
+      });
+    }
+  });
+}
+async function probeLocalModels(baseUrl) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/tags`, { signal: ctrl.signal });
+    clearTimeout(t);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+async function runSetupWizard() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    console.log("\n== Builder setup ==\n");
+    const cfg = loadConfig();
+    console.log("Model provider:");
+    PROVIDERS.forEach((p, i) => console.log(`  ${i + 1}) ${p}${KEYLESS.has(p) ? " (no key needed)" : ""}`));
+    const pi = await askChoice(rl, `Choose [1-${PROVIDERS.length}] (current: ${cfg.provider}): `, PROVIDERS.length) - 1;
+    const provider = PROVIDERS[pi];
+    const modelDefault = DEFAULT_MODELS[provider] ?? cfg.model;
+    const modelAns = (await ask(rl, `Model [${modelDefault}]: `)).trim();
+    const model = modelAns === "" ? modelDefault : modelAns;
+    let baseUrl = cfg.baseUrl;
+    if (provider === "ollama" || provider === "llamacpp" || provider === "lmstudio") {
+      const dflt = cfg.baseUrl ?? "http://127.0.0.1:11434";
+      const ans = (await ask(rl, `Server URL [${dflt}]: `)).trim();
+      baseUrl = ans === "" ? dflt : ans;
+    }
+    if (!KEYLESS.has(provider)) {
+      console.log(`
+API key for ${provider} (input hidden):`);
+      const key = await askSecret("Key (Enter to keep existing): ");
+      if (key.trim() !== "") {
+        const { fileCredentialStore: fileCredentialStore2 } = await Promise.resolve().then(() => (init_dist4(), dist_exports4));
+        await fileCredentialStore2.set(provider, "api_key", key.trim());
+        console.log("  Saved to OS-user store (0600 file, machine-bound encryption).");
+      } else {
+        console.log("  Kept existing credentials.");
+      }
+    } else {
+      console.log("\nChecking local server...");
+      const ok = await probeLocalModels(baseUrl ?? "http://127.0.0.1:11434");
+      console.log(ok ? "  Local model server reachable." : "  Could not reach local server \u2014 you can start it later (e.g. `ollama serve`).");
+    }
+    for (; ; ) {
+      const ans = await ask(rl, `
+Local port [${cfg.serverPort}]: `);
+      const port = parsePort(ans, cfg.serverPort);
+      if (port !== null) {
+        cfg.serverPort = port;
+        break;
+      }
+      console.log("  Enter a port 1024-65535 (or Enter for default).");
+    }
+    console.log("\nApproval policy for agent tool runs:");
+    console.log("  1) strict \u2014 confirm everything\n  2) moderate \u2014 confirm impactful actions\n  3) permissive \u2014 confirm only destructive actions");
+    const polMap = ["strict", "moderate", "permissive"];
+    const polRaw = await ask(rl, `Choose [1-3] (Enter to keep: ${cfg.approvals}): `);
+    let approvals = cfg.approvals;
+    if (polRaw.trim() !== "") {
+      const n = parseChoice(polRaw, 3);
+      if (n === null) {
+        console.log("  Keeping current policy.");
+      } else {
+        approvals = polMap[n - 1];
+      }
+    }
+    const openAns = (await ask(rl, `Open browser automatically? [${cfg.openBrowser ? "Y/n" : "y/N"}]: `)).trim().toLowerCase();
+    const openBrowser2 = openAns === "" ? cfg.openBrowser : openAns.startsWith("y");
+    const next = {
+      ...cfg,
+      provider,
+      model,
+      baseUrl,
+      approvals,
+      openBrowser: openBrowser2
+    };
+    saveConfig(next);
+    console.log(`
+Saved configuration to ${configPath()}.`);
+    return next;
+  } finally {
+    rl.close();
+  }
+}
+async function runMainMenu(actions) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    for (; ; ) {
+      const cfg = loadConfig();
+      console.log("\n== Builder \u2014 local-first AI web-app builder ==");
+      console.log(`  provider: ${cfg.provider} \xB7 model: ${cfg.model} \xB7 port: ${cfg.serverPort}`);
+      console.log("  1) Start developing (launch server + open browser)");
+      console.log("  2) Setup wizard (provider / model / key / port)");
+      console.log("  3) Environment check (doctor)");
+      console.log("  4) Show configuration");
+      console.log("  5) Manage credentials (auth)");
+      console.log("  6) Exit");
+      const raw = await ask(rl, "Choose [1-6]: ");
+      const c = parseChoice(raw, 6);
+      if (c === null) {
+        console.log("  Enter a number 1-6.");
+        continue;
+      }
+      if (c === 1) {
+        return await actions.start(false);
+      } else if (c === 2) {
+        await runSetupWizard();
+      } else if (c === 3) {
+        await actions.doctor();
+      } else if (c === 4) {
+        await actions.showConfig([]);
+      } else if (c === 5) {
+        const provider = (await ask(rl, "Provider (Enter to cancel): ")).trim();
+        if (provider !== "") {
+          const key = await askSecret("Key: ");
+          if (key.trim() !== "")
+            await actions.auth(["--provider", provider, "--key", key.trim()]);
+          else
+            console.log("  Cancelled (empty key).");
+        }
+      } else {
+        console.log("Bye.");
+        return 0;
+      }
+    }
+  } finally {
+    rl.close();
+  }
+}
+var PROVIDERS, KEYLESS, DEFAULT_MODELS;
+var init_tui = __esm({
+  "apps/cli/dist/tui.js"() {
+    "use strict";
+    init_dist2();
+    PROVIDERS = ["openai", "anthropic", "gemini", "openrouter", "ollama", "llamacpp", "lmstudio"];
+    KEYLESS = /* @__PURE__ */ new Set(["ollama", "llamacpp", "lmstudio"]);
+    DEFAULT_MODELS = {
+      openai: "gpt-4o-mini",
+      anthropic: "claude-sonnet-4-5",
+      gemini: "gemini-2.0-flash",
+      openrouter: "openai/gpt-4o-mini",
+      ollama: "llama3.1",
+      llamacpp: "default",
+      lmstudio: "default"
+    };
+  }
+});
+
+// apps/cli/dist/index.js
+init_dist2();
+import fs6 from "node:fs";
 import os3 from "node:os";
 import path7 from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile as execFile4 } from "node:child_process";
 
-// node_modules/@builder/config/dist/index.js
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-
-// node_modules/@builder/shared/dist/index.js
-var BuilderError = class extends Error {
-  code;
-  details;
-  constructor(code, message, details) {
-    super(message);
-    this.name = "BuilderError";
-    this.code = code;
-    this.details = details;
-  }
-  toJSON() {
-    return { name: this.name, code: this.code, message: this.message };
-  }
-};
-var SECRET_KEYS = [/api[_-]?key/i, /secret/i, /token/i, /password/i, /private[_-]?key/i, /authorization/i, /cookie/i, /set-cookie/i];
-function redact(value) {
-  if (typeof value === "string") {
-    if (value.length > 24 && /sk-|ghp_|gho_|xoxb-|Bearer/i.test(value))
-      return "[REDACTED]";
-    return value;
-  }
-  if (Array.isArray(value))
-    return value.map(redact);
-  if (value && typeof value === "object") {
-    const out = {};
-    for (const [k, v] of Object.entries(value)) {
-      out[k] = SECRET_KEYS.some((r) => r.test(k)) ? "[REDACTED]" : redact(v);
-    }
-    return out;
-  }
-  return value;
-}
-function createLogger(scope, level = "info") {
-  const order = ["debug", "info", "warn", "error"];
-  const enabled = (l) => order.indexOf(l) >= order.indexOf(level);
-  const emit = (l, msg, fields) => {
-    if (!enabled(l))
-      return;
-    const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), level: l, scope, msg, ...fields ? { fields: redact(fields) } : {} });
-    if (l === "error" || l === "warn")
-      console.error(line);
-    else
-      console.log(line);
-  };
-  return {
-    debug: (m, f) => emit("debug", m, f),
-    info: (m, f) => emit("info", m, f),
-    warn: (m, f) => emit("warn", m, f),
-    error: (m, f) => emit("error", m, f)
-  };
-}
-function uid(prefix = "id") {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// node_modules/@builder/config/dist/index.js
-var DEFAULTS = {
-  provider: "ollama",
-  model: "llama3.1",
-  baseUrl: "http://127.0.0.1:11434",
-  serverPort: 4173,
-  host: "127.0.0.1",
-  exposeLan: false,
-  theme: "system",
-  openBrowser: true,
-  approvals: "moderate",
-  previewBehavior: "auto",
-  agent: { maxIterations: 40, maxToolCalls: 120, commandTimeoutMs: 12e4, runTimeoutMs: 9e5, retryLimit: 5 }
-};
-function configDir() {
-  return path.join(os.homedir(), ".builder");
-}
-function configPath() {
-  return path.join(configDir(), "config.json");
-}
-function loadConfig(overrides = {}) {
-  let file = {};
-  try {
-    const raw = fs.readFileSync(configPath(), "utf8");
-    file = JSON.parse(raw);
-  } catch {
-  }
-  const env = {};
-  if (process.env.BUILDER_PORT)
-    env.serverPort = Number(process.env.BUILDER_PORT);
-  if (process.env.BUILDER_PROVIDER)
-    env.provider = process.env.BUILDER_PROVIDER;
-  if (process.env.BUILDER_MODEL)
-    env.model = process.env.BUILDER_MODEL;
-  const merged = { ...DEFAULTS, ...file, ...env, ...overrides };
-  validateConfig(merged);
-  return merged;
-}
-function validateConfig(c) {
-  if (!Number.isInteger(c.serverPort) || c.serverPort < 1024 || c.serverPort > 65535) {
-    throw new BuilderError("VALIDATION_ERROR", `Invalid serverPort: ${c.serverPort}`);
-  }
-  if (!["strict", "moderate", "permissive"].includes(c.approvals)) {
-    throw new BuilderError("VALIDATION_ERROR", `Invalid approvals policy: ${c.approvals}`);
-  }
-  if (!c.model || typeof c.model !== "string")
-    throw new BuilderError("VALIDATION_ERROR", "model must be a non-empty string");
-  if (!c.provider || typeof c.provider !== "string")
-    throw new BuilderError("VALIDATION_ERROR", "provider must be a non-empty string");
-  if (c.agent.maxIterations < 1 || c.agent.maxIterations > 500)
-    throw new BuilderError("VALIDATION_ERROR", "agent.maxIterations out of range");
-}
-function saveConfig(c) {
-  validateConfig(c);
-  fs.mkdirSync(configDir(), { recursive: true });
-  const { ...safe } = c;
-  fs.writeFileSync(configPath(), JSON.stringify(safe, null, 2) + "\n", { mode: 384 });
-}
-
 // node_modules/@builder/runtime/dist/index.js
+init_dist();
 import http from "node:http";
 import fs4 from "node:fs";
 import path6 from "node:path";
 
 // node_modules/@builder/project-engine/dist/index.js
+init_dist();
 import fs2 from "node:fs";
 import fsp2 from "node:fs/promises";
 import path3 from "node:path";
 
 // node_modules/@builder/filesystem/dist/index.js
+init_dist();
 import fsp from "node:fs/promises";
 import path2 from "node:path";
 var DEFAULT_IGNORES = /* @__PURE__ */ new Set(["node_modules", "dist", "build", "coverage", ".cache", ".git", ".builder-tmp"]);
@@ -537,6 +808,7 @@ async function copyDir(src, dest) {
 }
 
 // node_modules/@builder/process-manager/dist/index.js
+init_dist();
 import { spawn } from "node:child_process";
 var MAX_OUTPUT = 2e5;
 var ProcessManager = class {
@@ -655,7 +927,11 @@ async function findFreePort(start2, host = "127.0.0.1") {
   throw new BuilderError("INTERNAL", `No free port found from ${start2}`);
 }
 
+// node_modules/@builder/agent/dist/index.js
+init_dist();
+
 // node_modules/@builder/model-gateway/dist/index.js
+init_dist();
 function sseParse(text) {
   const trimmed = text.trim();
   if (trimmed.startsWith("{") && trimmed.includes('"tool"')) {
@@ -805,10 +1081,12 @@ system actions without permission. Respect project boundaries. Stop when accepta
 Respond ONLY with concise operational status plus structured tool calls.`;
 
 // node_modules/@builder/agent-tools/dist/index.js
-import { execFile as execFile3 } from "node:child_process";
 init_dist();
+init_dist3();
+import { execFile as execFile3 } from "node:child_process";
 
 // node_modules/@builder/git/dist/index.js
+init_dist();
 import { execFile } from "node:child_process";
 function run(gitArgs, cwd) {
   return new Promise((resolve, reject) => {
@@ -854,6 +1132,7 @@ async function pull(cwd) {
 }
 
 // node_modules/@builder/github/dist/index.js
+init_dist();
 import { execFile as execFile2 } from "node:child_process";
 function sh(cmd, args, cwd) {
   return new Promise((resolve, reject) => {
@@ -982,7 +1261,7 @@ async function executeTool(tool, input, ctx) {
   if (!def)
     throw new BuilderError("TOOL_ERROR", `Unknown tool: ${tool}`);
   def.validate(input);
-  const dangerous = tool === "run_command" ? (await Promise.resolve().then(() => (init_dist(), dist_exports))).isDangerousCommand([String(input["command"] ?? ""), ...input["args"] ?? []].join(" ")) : false;
+  const dangerous = tool === "run_command" ? (await Promise.resolve().then(() => (init_dist3(), dist_exports))).isDangerousCommand([String(input["command"] ?? ""), ...input["args"] ?? []].join(" ")) : false;
   const decision = decide(tool, ctx.policy, { dangerous });
   if (decision.requiresApproval && !ctx.approvals.get(tool)) {
     if (ctx.confirmHighImpact) {
@@ -1245,7 +1524,7 @@ function nextState(s) {
 }
 
 // node_modules/@builder/runtime/dist/index.js
-init_dist2();
+init_dist4();
 var JSON_LIMIT = 2 * 1024 * 1024;
 function sendJson(res, code, body) {
   const payload = JSON.stringify(body);
@@ -1461,7 +1740,7 @@ async function startRuntime(opts) {
         const body = await readBody(req2);
         if (!body.command)
           throw new BuilderError("VALIDATION_ERROR", "command is required");
-        const { validateCommand: validateCommand2 } = await Promise.resolve().then(() => (init_dist(), dist_exports));
+        const { validateCommand: validateCommand2 } = await Promise.resolve().then(() => (init_dist3(), dist_exports));
         const v = validateCommand2(body.command, body.args ?? [], engine.requireRoot(), engine.requireRoot());
         if (!v.ok)
           throw new BuilderError("PERMISSION_DENIED", v.reason ?? "blocked");
@@ -1591,7 +1870,12 @@ var VERSION = "0.1.0";
 function printHelp() {
   console.log(`builder ${VERSION} \u2014 local-first AI web-app builder
 Usage:
-  builder [start]        Start the local IDE (default)
+  builder                Interactive menu (setup wizard on first run)
+  builder menu           Same as above
+  builder start          Start the local IDE directly (skip menu)
+  builder start --wizard Run the setup wizard before starting
+  builder start --no-tui Start directly even when interactive
+  builder wizard         Run the setup wizard once and exit
   builder doctor         Check environment and configuration
   builder config         Show configuration
   builder config --set key=value  Update configuration
@@ -1657,7 +1941,7 @@ function openBrowser(url) {
   });
 }
 async function handleAuth(args) {
-  const { fileCredentialStore: fileCredentialStore2 } = await Promise.resolve().then(() => (init_dist2(), dist_exports4));
+  const { fileCredentialStore: fileCredentialStore2 } = await Promise.resolve().then(() => (init_dist4(), dist_exports4));
   const get = (flag) => {
     const i = args.indexOf(flag);
     return i >= 0 ? args[i + 1] : void 0;
@@ -1703,8 +1987,8 @@ async function start(noOpen) {
     path7.resolve(here, "../../apps/web/dist"),
     path7.resolve(process.cwd(), "apps/web/dist")
   ];
-  const webDistDir = candidates.find((d) => fs5.existsSync(path7.join(d, "index.html")));
-  const templatesDir = [path7.resolve(here, "../templates"), path7.resolve(process.cwd(), "templates"), path7.resolve(here, "../../templates")].find((d) => fs5.existsSync(d)) ?? path7.resolve(process.cwd(), "templates");
+  const webDistDir = candidates.find((d) => fs6.existsSync(path7.join(d, "index.html")));
+  const templatesDir = [path7.resolve(here, "../templates"), path7.resolve(process.cwd(), "templates"), path7.resolve(here, "../../templates")].find((d) => fs6.existsSync(d)) ?? path7.resolve(process.cwd(), "templates");
   const rt = await startRuntime({ config: cfg, webDistDir, templatesDir });
   console.log("\u2713 Local runtime ready");
   console.log("\u2713 Agent runtime ready");
@@ -1735,8 +2019,35 @@ async function main() {
   const [, , cmd, ...rest] = process.argv;
   switch (cmd) {
     case void 0:
-    case "start":
+    case "menu": {
+      const { isInteractive: isInteractive2, isFirstRun: isFirstRun2, runSetupWizard: runSetupWizard2, runMainMenu: runMainMenu2 } = await Promise.resolve().then(() => (init_tui(), tui_exports));
+      if (!isInteractive2())
+        return start(rest.includes("--no-open"));
+      if (isFirstRun2(loadConfig()))
+        await runSetupWizard2();
+      return runMainMenu2({
+        start: (noOpen) => start(noOpen),
+        doctor: () => doctor(),
+        showConfig: (a) => handleConfig(a),
+        auth: (a) => handleAuth(a)
+      });
+    }
+    case "wizard": {
+      const { runSetupWizard: runSetupWizard2 } = await Promise.resolve().then(() => (init_tui(), tui_exports));
+      await runSetupWizard2();
+      return 0;
+    }
+    case "start": {
+      if (rest.includes("--wizard")) {
+        const { runSetupWizard: runSetupWizard2 } = await Promise.resolve().then(() => (init_tui(), tui_exports));
+        await runSetupWizard2();
+      } else if (!rest.includes("--no-tui")) {
+        const { isInteractive: isInteractive2, isFirstRun: isFirstRun2, runSetupWizard: runSetupWizard2 } = await Promise.resolve().then(() => (init_tui(), tui_exports));
+        if (isInteractive2() && isFirstRun2(loadConfig()))
+          await runSetupWizard2();
+      }
       return start(rest.includes("--no-open"));
+    }
     case "doctor":
       return doctor();
     case "version":

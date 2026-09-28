@@ -12,7 +12,12 @@ const VERSION = '0.1.0';
 function printHelp(): void {
   console.log(`builder ${VERSION} — local-first AI web-app builder
 Usage:
-  builder [start]        Start the local IDE (default)
+  builder                Interactive menu (setup wizard on first run)
+  builder menu           Same as above
+  builder start          Start the local IDE directly (skip menu)
+  builder start --wizard Run the setup wizard before starting
+  builder start --no-tui Start directly even when interactive
+  builder wizard         Run the setup wizard once and exit
   builder doctor         Check environment and configuration
   builder config         Show configuration
   builder config --set key=value  Update configuration
@@ -152,7 +157,32 @@ async function main(): Promise<number> {
   const [, , cmd, ...rest] = process.argv;
   switch (cmd) {
     case undefined:
-    case 'start': return start(rest.includes('--no-open'));
+    case 'menu': {
+      const { isInteractive, isFirstRun, runSetupWizard, runMainMenu } = await import('./tui.js');
+      if (!isInteractive()) return start(rest.includes('--no-open'));
+      if (isFirstRun(loadConfig())) await runSetupWizard();
+      return runMainMenu({
+        start: (noOpen) => start(noOpen),
+        doctor: () => doctor(),
+        showConfig: (a) => handleConfig(a),
+        auth: (a) => handleAuth(a),
+      });
+    }
+    case 'wizard': {
+      const { runSetupWizard } = await import('./tui.js');
+      await runSetupWizard();
+      return 0;
+    }
+    case 'start': {
+      if (rest.includes('--wizard')) {
+        const { runSetupWizard } = await import('./tui.js');
+        await runSetupWizard();
+      } else if (!rest.includes('--no-tui')) {
+        const { isInteractive, isFirstRun, runSetupWizard } = await import('./tui.js');
+        if (isInteractive() && isFirstRun(loadConfig())) await runSetupWizard();
+      }
+      return start(rest.includes('--no-open'));
+    }
     case 'doctor': return doctor();
     case 'version':
     case '--version': console.log(VERSION); return 0;
