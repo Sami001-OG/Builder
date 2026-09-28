@@ -1,0 +1,75 @@
+/* Design tokens — dark developer IDE (Linear/Vercel-inspired).
+   System font stack only (offline-safe, CSP-compliant: no webfonts). */
+:root {
+  color-scheme: dark;
+
+  /* Background scale */
+  --bg-0: #0b0d12; /* app shell */
+  --bg-1: #10131a; /* panels */
+  --bg-2: #151924; /* raised surfaces */
+  --bg-3: #1c2130; /* hover / active */
+  --bg-preview: #ffffff;
+
+  /* Borders — hairline, low-contrast */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(88, 140, 255, 0.55);
+
+  /* Text scale */
+  --text-1: #e8ebf1;
+  --text-2: #a7adbb;
+  --text-3: #6b7280;
+  --text-inverse: #0b0d12;
+
+  /* Accent */
+  --accent: #4c8dff;
+  --accent-hover: #6aa3ff;
+  --accent-dim: rgba(76, 141, 255, 0.14);
+  --accent-text: #bcd4ff;
+
+  /* Status */
+  --ok: #3fb68b;
+  --ok-dim: rgba(63, 182, 139, 0.14);
+  --warn: #d9a13b;
+  --warn-dim: rgba(217, 161, 59, 0.14);
+  --err: #e56262;
+  --err-dim: rgba(229, 98, 98, 0.14);
+
+  /* Shape */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  /* Spacing (8pt grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+
+  /* Density */
+  --topbar-h: 48px;
+  --statusbar-h: 28px;
+  --sidebar-w: 320px;
+  --preview-w: 440px;
+  --bottom-h: 232px;
+
+  /* Motion (tasteful micro-motion: fast, no bounce) */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+
+  /* Shadows */
+  --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

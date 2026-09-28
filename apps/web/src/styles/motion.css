@@ -1,0 +1,39 @@
+/* Tasteful micro-motion: fast, ease-out, never bouncy. Fully disabled under reduced-motion. */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.anim-fade { animation: fade-in var(--dur-2) var(--ease); }
+.anim-rise { animation: rise-in var(--dur-2) var(--ease); }
+.anim-toast { animation: toast-in var(--dur-2) var(--ease); }
+
+.spin { animation: spin 1s linear infinite; }
+.pulse { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+/* Streaming shimmer for in-flight agent text */
+.shimmer {
+  background: linear-gradient(100deg, var(--text-2) 30%, var(--text-1) 50%, var(--text-2) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Skeleton loading blocks */
+.skeleton {
+  border-radius: var(--r-sm);
+  background: linear-gradient(100deg, var(--bg-2) 30%, var(--bg-3) 50%, var(--bg-2) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Stagger helper for lists (set --i inline) */
+.stagger > * { animation: rise-in var(--dur-2) var(--ease) both; animation-delay: calc(var(--i, 0) * 24ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
