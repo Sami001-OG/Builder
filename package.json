@@ -1,0 +1,30 @@
+{
+  "name": "@builder/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first AI-powered web application builder",
+  "type": "module",
+  "packageManager": "npm@11.16.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "typescript": "^5.6.2"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:packages": "node scripts/build-packages.mjs",
+    "test": "npm run test --workspaces --if-present",
+    "test:unit": "node scripts/run-unit-tests.mjs",
+    "dev": "node scripts/dev.mjs",
+    "doctor": "node apps/cli/dist/index.js doctor",
+    "verify": "node scripts/verify.mjs",
+    "lint": "node scripts/lint.mjs",
+    "format": "node scripts/format.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

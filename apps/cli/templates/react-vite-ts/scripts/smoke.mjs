@@ -1,0 +1,8 @@
+import fs from 'node:fs';
+const required = ['package.json', 'index.html', 'src/App.tsx', 'src/main.tsx', 'vite.config.ts', 'tsconfig.json'];
+let ok = true;
+for (const f of required) {
+  if (!fs.existsSync(new URL(`../${f}`, import.meta.url))) { console.error(`missing ${f}`); ok = false; }
+}
+console.log(ok ? 'template smoke test passed' : 'template smoke test FAILED');
+process.exit(ok ? 0 : 1);

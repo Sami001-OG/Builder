@@ -1,0 +1,19 @@
+{
+  "name": "@builder/agent-tools",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "files": ["dist"],
+  "dependencies": {
+    "@builder/shared": "0.1.0",
+    "@builder/filesystem": "0.1.0",
+    "@builder/project-engine": "0.1.0",
+    "@builder/process-manager": "0.1.0",
+    "@builder/permissions": "0.1.0",
+    "@builder/git": "0.1.0",
+    "@builder/github": "0.1.0"
+  },
+  "scripts": { "build": "tsc -p tsconfig.json" }
+}

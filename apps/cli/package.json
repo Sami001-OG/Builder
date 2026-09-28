@@ -1,0 +1,14 @@
+{
+  "name": "@builder/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "builder": "./dist/index.js" },
+  "exports": { ".": "./dist/index.js", "./package.json": "./package.json" },
+  "files": ["dist", "web-dist", "templates"],
+  "dependencies": {
+    "@builder/shared": "0.1.0",
+    "@builder/config": "0.1.0",
+    "@builder/runtime": "0.1.0"
+  },
+  "scripts": { "build": "tsc -p tsconfig.json" }
+}
