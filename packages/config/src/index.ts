@@ -62,6 +62,11 @@ export function validateConfig(c: BuilderConfig): void {
   }
   if (!c.model || typeof c.model !== 'string') throw new BuilderError('VALIDATION_ERROR', 'model must be a non-empty string');
   if (!c.provider || typeof c.provider !== 'string') throw new BuilderError('VALIDATION_ERROR', 'provider must be a non-empty string');
+  if (c.provider.toLowerCase() === 'custom') {
+    if (!c.model || typeof c.model !== 'string' || c.model.trim() === '') throw new BuilderError('VALIDATION_ERROR', 'model must be a non-empty string (required for custom provider)');
+    if (!c.baseUrl || typeof c.baseUrl !== 'string' || c.baseUrl.trim() === '') throw new BuilderError('VALIDATION_ERROR', 'baseUrl is required for custom provider');
+    if (!(c.baseUrl.startsWith('http://') || c.baseUrl.startsWith('https://'))) throw new BuilderError('VALIDATION_ERROR', 'custom baseUrl must start with http:// or https://');
+  }
   if (c.agent.maxIterations < 1 || c.agent.maxIterations > 500) throw new BuilderError('VALIDATION_ERROR', 'agent.maxIterations out of range');
 }
 

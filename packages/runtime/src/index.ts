@@ -114,7 +114,7 @@ export async function startRuntime(opts: RuntimeOptions): Promise<StartedRuntime
     runTimeoutMs: opts.config.agent.runTimeoutMs,
   });
 
-  const port = await findFreePort(opts.config.serverPort, opts.config.host);
+  let port = await findFreePort(opts.config.serverPort, opts.config.host);
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', `http://${opts.config.host}:${port}`);
@@ -131,7 +131,7 @@ export async function startRuntime(opts: RuntimeOptions): Promise<StartedRuntime
         return;
       }
       if (p === '/api/models' && method === 'GET') {
-        sendJson(res, 200, { provider: opts.config.provider, model: opts.config.model, supported: ['openai', 'anthropic', 'gemini', 'openrouter', 'ollama', 'llamacpp', 'lmstudio'] });
+        sendJson(res, 200, { provider: opts.config.provider, model: opts.config.model, supported: ['openai', 'anthropic', 'gemini', 'openrouter', 'ollama', 'llamacpp', 'lmstudio', 'custom'] });
         return;
       }
       // --- SSE events ---
@@ -306,7 +306,23 @@ export async function startRuntime(opts: RuntimeOptions): Promise<StartedRuntime
   }
 
   await new Promise<void>((resolve) => server.listen(port, opts.config.host, resolve));
-  log.info('runtime listening', { url: `http://${opts.config.host}:${port}` });
+  // Source of truth: the actually-bound port (covers ephemeral port 0 and races).
+  const addr = server.address() as import('node:net').AddressInfo | string | null;
+  const boundPort = (addr && typeof addr === 'object' && typeof addr.port === 'number') ? addr.port : port;
+  port = boundPort;
+  const url = `http://${opts.config.host}:${boundPort}`;
+  log.info('runtime listening', { url });
+
+  // Best-effort self-check: confirm the server answers its own health endpoint.
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(`${url}/api/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    log.info('health self-check', { ok: res.ok, url: `${url}/api/health` });
+  } catch (e) {
+    log.info('health self-check failed (non-fatal)', { error: (e as Error).message });
+  }
 
   const shutdown = async () => {
     procs.stopAll();
@@ -316,8 +332,8 @@ export async function startRuntime(opts: RuntimeOptions): Promise<StartedRuntime
   process.on('SIGTERM', () => void shutdown());
 
   return {
-    port,
-    url: `http://${opts.config.host}:${port}`,
+    port: boundPort,
+    url,
     close: shutdown,
     engine, procs, agent,
   };

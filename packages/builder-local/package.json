@@ -1,6 +1,6 @@
 {
   "name": "builder-local",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local-first AI-powered web application builder — CLI + local runtime + browser IDE",
   "type": "module",
   "license": "MIT",

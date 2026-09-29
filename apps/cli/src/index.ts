@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { loadConfig, saveConfig, configPath } from '@builder/config';
 import { startRuntime } from '@builder/runtime';
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 
 function printHelp(): void {
   console.log(`builder ${VERSION} — local-first AI web-app builder
@@ -139,6 +139,17 @@ async function start(noOpen: boolean): Promise<number> {
   console.log('✓ Agent runtime ready');
   console.log('✓ Local server ready');
   console.log(`\nLocal URL:\n${rt.url}\n`);
+  // Best-effort self-check: confirm the local server answers its own health endpoint.
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(`${rt.url}/api/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) console.log('✓ Local server responding');
+    else console.warn(`! Local server self-check returned ${res.status} (continuing anyway)`);
+  } catch (e) {
+    console.warn(`! Local server self-check failed (continuing anyway): ${(e as Error).message}`);
+  }
   if (cfg.openBrowser && !noOpen) {
     console.log('Opening browser...');
     openBrowser(rt.url);

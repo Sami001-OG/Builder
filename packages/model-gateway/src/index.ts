@@ -148,6 +148,12 @@ export function createProvider(cfg: ProviderConfig): ModelProvider {
   const p = cfg.provider.toLowerCase();
   if (p === 'anthropic') return new AnthropicProvider(cfg);
   if (p === 'gemini') return new GeminiProvider(cfg);
+  if (p === 'custom') {
+    if (!cfg.baseUrl || typeof cfg.baseUrl !== 'string' || cfg.baseUrl.trim() === '') {
+      throw new BuilderError('VALIDATION_ERROR', 'custom provider requires baseUrl (OpenAI-compatible endpoint)');
+    }
+    return new OpenAICompatibleProvider(cfg);
+  }
   // openai, openrouter, ollama, llamacpp, lmstudio all speak OpenAI-compatible chat completions
   return new OpenAICompatibleProvider(cfg);
 }

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import readline from 'node:readline';
 import { loadConfig, saveConfig, configPath, type BuilderConfig } from '@builder/config';
 
-export const PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter', 'ollama', 'llamacpp', 'lmstudio'] as const;
+export const PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter', 'ollama', 'llamacpp', 'lmstudio', 'custom'] as const;
 const KEYLESS = new Set(['ollama', 'llamacpp', 'lmstudio']);
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
@@ -16,6 +16,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   ollama: 'llama3.1',
   llamacpp: 'default',
   lmstudio: 'default',
+  custom: '',
 };
 
 export function isInteractive(): boolean {
@@ -104,6 +105,18 @@ async function probeLocalModels(baseUrl: string): Promise<boolean> {
   } catch { return false; }
 }
 
+async function probeCustomEndpoint(baseUrl: string, apiKey?: string): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const headers: Record<string, string> = {};
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/models`, { signal: ctrl.signal, headers });
+    clearTimeout(t);
+    return res.ok;
+  } catch { return false; }
+}
+
 export async function runSetupWizard(): Promise<BuilderConfig> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -114,18 +127,54 @@ export async function runSetupWizard(): Promise<BuilderConfig> {
     PROVIDERS.forEach((p, i) => console.log(`  ${i + 1}) ${p}${KEYLESS.has(p) ? ' (no key needed)' : ''}`));
     const pi = (await askChoice(rl, `Choose [1-${PROVIDERS.length}] (current: ${cfg.provider}): `, PROVIDERS.length)) - 1;
     const provider = PROVIDERS[pi];
-    const modelDefault = DEFAULT_MODELS[provider] ?? cfg.model;
-    const modelAns = (await ask(rl, `Model [${modelDefault}]: `)).trim();
-    const model = modelAns === '' ? modelDefault : modelAns;
+    let model: string;
+    if (provider === 'custom') {
+      for (;;) {
+        const ans = (await ask(rl, 'Model name (required, e.g. my-model): ')).trim();
+        if (ans !== '') { model = ans; break; }
+        console.log('  Model name is required for the custom provider.');
+      }
+    } else {
+      const modelDefault = DEFAULT_MODELS[provider] ?? cfg.model;
+      const modelAns = (await ask(rl, `Model [${modelDefault}]: `)).trim();
+      model = modelAns === '' ? modelDefault : modelAns;
+    }
 
     let baseUrl = cfg.baseUrl;
-    if (provider === 'ollama' || provider === 'llamacpp' || provider === 'lmstudio') {
+    if (provider === 'custom') {
+      const dflt = 'http://127.0.0.1:8080';
+      for (;;) {
+        const ans = (await ask(rl, `Server URL (OpenAI-compatible endpoint) [${dflt}]: `)).trim();
+        const candidate = ans === '' ? dflt : ans;
+        if (candidate === '' || !(candidate.startsWith('http://') || candidate.startsWith('https://'))) {
+          console.log('  Enter a valid URL starting with http:// or https://.');
+          continue;
+        }
+        baseUrl = candidate;
+        break;
+      }
+    } else if (provider === 'ollama' || provider === 'llamacpp' || provider === 'lmstudio') {
       const dflt = cfg.baseUrl ?? 'http://127.0.0.1:11434';
       const ans = (await ask(rl, `Server URL [${dflt}]: `)).trim();
       baseUrl = ans === '' ? dflt : ans;
     }
 
-    if (!KEYLESS.has(provider)) {
+    let customKey = '';
+    if (provider === 'custom') {
+      console.log('\nAPI key for custom endpoint (input hidden, Enter to skip if none needed):');
+      const key = await askSecret('Key (Enter to skip): ');
+      customKey = key.trim();
+      if (customKey !== '') {
+        const { fileCredentialStore } = await import('@builder/credentials');
+        await fileCredentialStore.set(provider, 'api_key', customKey);
+        console.log('  Saved to OS-user store (0600 file, machine-bound encryption).');
+      } else {
+        console.log('  No key saved (endpoint used without auth).');
+      }
+      console.log('\nChecking custom endpoint...');
+      const ok = await probeCustomEndpoint(baseUrl ?? 'http://127.0.0.1:8080', customKey || undefined);
+      console.log(ok ? '  Custom endpoint reachable.' : '  Could not reach custom endpoint — check the URL and try again later (continuing anyway).');
+    } else if (!KEYLESS.has(provider)) {
       console.log(`\nAPI key for ${provider} (input hidden):`);
       const key = await askSecret('Key (Enter to keep existing): ');
       if (key.trim() !== '') {

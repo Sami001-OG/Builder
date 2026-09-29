@@ -426,6 +426,20 @@ async function probeLocalModels(baseUrl) {
     return false;
   }
 }
+async function probeCustomEndpoint(baseUrl, apiKey) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    const headers = {};
+    if (apiKey)
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/models`, { signal: ctrl.signal, headers });
+    clearTimeout(t);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 async function runSetupWizard() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -435,16 +449,55 @@ async function runSetupWizard() {
     PROVIDERS.forEach((p, i) => console.log(`  ${i + 1}) ${p}${KEYLESS.has(p) ? " (no key needed)" : ""}`));
     const pi = await askChoice(rl, `Choose [1-${PROVIDERS.length}] (current: ${cfg.provider}): `, PROVIDERS.length) - 1;
     const provider = PROVIDERS[pi];
-    const modelDefault = DEFAULT_MODELS[provider] ?? cfg.model;
-    const modelAns = (await ask(rl, `Model [${modelDefault}]: `)).trim();
-    const model = modelAns === "" ? modelDefault : modelAns;
+    let model;
+    if (provider === "custom") {
+      for (; ; ) {
+        const ans = (await ask(rl, "Model name (required, e.g. my-model): ")).trim();
+        if (ans !== "") {
+          model = ans;
+          break;
+        }
+        console.log("  Model name is required for the custom provider.");
+      }
+    } else {
+      const modelDefault = DEFAULT_MODELS[provider] ?? cfg.model;
+      const modelAns = (await ask(rl, `Model [${modelDefault}]: `)).trim();
+      model = modelAns === "" ? modelDefault : modelAns;
+    }
     let baseUrl = cfg.baseUrl;
-    if (provider === "ollama" || provider === "llamacpp" || provider === "lmstudio") {
+    if (provider === "custom") {
+      const dflt = "http://127.0.0.1:8080";
+      for (; ; ) {
+        const ans = (await ask(rl, `Server URL (OpenAI-compatible endpoint) [${dflt}]: `)).trim();
+        const candidate = ans === "" ? dflt : ans;
+        if (candidate === "" || !(candidate.startsWith("http://") || candidate.startsWith("https://"))) {
+          console.log("  Enter a valid URL starting with http:// or https://.");
+          continue;
+        }
+        baseUrl = candidate;
+        break;
+      }
+    } else if (provider === "ollama" || provider === "llamacpp" || provider === "lmstudio") {
       const dflt = cfg.baseUrl ?? "http://127.0.0.1:11434";
       const ans = (await ask(rl, `Server URL [${dflt}]: `)).trim();
       baseUrl = ans === "" ? dflt : ans;
     }
-    if (!KEYLESS.has(provider)) {
+    let customKey = "";
+    if (provider === "custom") {
+      console.log("\nAPI key for custom endpoint (input hidden, Enter to skip if none needed):");
+      const key = await askSecret("Key (Enter to skip): ");
+      customKey = key.trim();
+      if (customKey !== "") {
+        const { fileCredentialStore: fileCredentialStore2 } = await Promise.resolve().then(() => (init_dist4(), dist_exports4));
+        await fileCredentialStore2.set(provider, "api_key", customKey);
+        console.log("  Saved to OS-user store (0600 file, machine-bound encryption).");
+      } else {
+        console.log("  No key saved (endpoint used without auth).");
+      }
+      console.log("\nChecking custom endpoint...");
+      const ok = await probeCustomEndpoint(baseUrl ?? "http://127.0.0.1:8080", customKey || void 0);
+      console.log(ok ? "  Custom endpoint reachable." : "  Could not reach custom endpoint \u2014 check the URL and try again later (continuing anyway).");
+    } else if (!KEYLESS.has(provider)) {
       console.log(`
 API key for ${provider} (input hidden):`);
       const key = await askSecret("Key (Enter to keep existing): ");
@@ -551,7 +604,7 @@ var init_tui = __esm({
   "apps/cli/dist/tui.js"() {
     "use strict";
     init_dist2();
-    PROVIDERS = ["openai", "anthropic", "gemini", "openrouter", "ollama", "llamacpp", "lmstudio"];
+    PROVIDERS = ["openai", "anthropic", "gemini", "openrouter", "ollama", "llamacpp", "lmstudio", "custom"];
     KEYLESS = /* @__PURE__ */ new Set(["ollama", "llamacpp", "lmstudio"]);
     DEFAULT_MODELS = {
       openai: "gpt-4o-mini",
@@ -560,7 +613,8 @@ var init_tui = __esm({
       openrouter: "openai/gpt-4o-mini",
       ollama: "llama3.1",
       llamacpp: "default",
-      lmstudio: "default"
+      lmstudio: "default",
+      custom: ""
     };
   }
 });
@@ -1866,7 +1920,7 @@ async function startRuntime(opts) {
 }
 
 // apps/cli/dist/index.js
-var VERSION = "0.1.1";
+var VERSION = "0.1.2";
 function printHelp() {
   console.log(`builder ${VERSION} \u2014 local-first AI web-app builder
 Usage:
@@ -1997,6 +2051,18 @@ async function start(noOpen) {
 Local URL:
 ${rt.url}
 `);
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    const res = await fetch(`${rt.url}/api/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok)
+      console.log("\u2713 Local server responding");
+    else
+      console.warn(`! Local server self-check returned ${res.status} (continuing anyway)`);
+  } catch (e) {
+    console.warn(`! Local server self-check failed (continuing anyway): ${e.message}`);
+  }
   if (cfg.openBrowser && !noOpen) {
     console.log("Opening browser...");
     openBrowser(rt.url);
