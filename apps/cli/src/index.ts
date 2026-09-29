@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { loadConfig, saveConfig, configPath } from '@builder/config';
 import { startRuntime } from '@builder/runtime';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 function printHelp(): void {
   console.log(`builder ${VERSION} — local-first AI web-app builder

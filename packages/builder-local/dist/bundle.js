@@ -1866,7 +1866,7 @@ async function startRuntime(opts) {
 }
 
 // apps/cli/dist/index.js
-var VERSION = "0.1.0";
+var VERSION = "0.1.1";
 function printHelp() {
   console.log(`builder ${VERSION} \u2014 local-first AI web-app builder
 Usage:
