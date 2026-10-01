@@ -1920,7 +1920,7 @@ async function startRuntime(opts) {
 }
 
 // apps/cli/dist/index.js
-var VERSION = "0.1.2";
+var VERSION = "0.1.3";
 function printHelp() {
   console.log(`builder ${VERSION} \u2014 local-first AI web-app builder
 Usage:
@@ -2038,7 +2038,7 @@ async function start(noOpen) {
   const here = path7.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     path7.resolve(here, "../web-dist"),
-    path7.resolve(here, "../../apps/web/dist"),
+    path7.resolve(here, "../../../apps/web/dist"),
     path7.resolve(process.cwd(), "apps/web/dist")
   ];
   const webDistDir = candidates.find((d) => fs6.existsSync(path7.join(d, "index.html")));
