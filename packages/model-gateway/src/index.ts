@@ -53,6 +53,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
           messages: [{ role: 'system', content: input.system }, ...input.messages],
           tools: input.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })),
           tool_choice: 'auto',
+          stream: false,
         }),
       });
     } catch (e) {

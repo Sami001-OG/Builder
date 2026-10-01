@@ -36,6 +36,22 @@ function copyDir(src, dest) {
 console.log('rebuilding packages...');
 await run(process.execPath, [path.join(ROOT, 'scripts', 'build-packages.mjs')], ROOT);
 
+// 1b. Ensure node_modules/@builder/* has fresh dists (npm workspaces may not be symlinked on Windows).
+for (const p of fs.readdirSync(path.join(ROOT, 'packages'))) {
+  const srcDist = path.join(ROOT, 'packages', p, 'dist');
+  const targetDist = path.join(ROOT, 'node_modules', '@builder', p, 'dist');
+  if (fs.existsSync(srcDist) && fs.existsSync(path.dirname(targetDist))) {
+    copyDir(srcDist, targetDist);
+  }
+}
+for (const a of fs.readdirSync(path.join(ROOT, 'apps'))) {
+  const srcDist = path.join(ROOT, 'apps', a, 'dist');
+  const targetDist = path.join(ROOT, 'node_modules', '@builder', a, 'dist');
+  if (fs.existsSync(srcDist) && fs.existsSync(path.dirname(targetDist))) {
+    copyDir(srcDist, targetDist);
+  }
+}
+
 // 2. Bundle the CLI entry (workspace @builder/* deps resolve via symlinks and get inlined).
 console.log('bundling CLI with esbuild...');
 fs.mkdirSync(DIST_DIR, { recursive: true });

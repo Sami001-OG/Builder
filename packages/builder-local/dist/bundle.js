@@ -108,6 +108,14 @@ function validateConfig(c) {
     throw new BuilderError("VALIDATION_ERROR", "model must be a non-empty string");
   if (!c.provider || typeof c.provider !== "string")
     throw new BuilderError("VALIDATION_ERROR", "provider must be a non-empty string");
+  if (c.provider.toLowerCase() === "custom") {
+    if (!c.model || typeof c.model !== "string" || c.model.trim() === "")
+      throw new BuilderError("VALIDATION_ERROR", "model must be a non-empty string (required for custom provider)");
+    if (!c.baseUrl || typeof c.baseUrl !== "string" || c.baseUrl.trim() === "")
+      throw new BuilderError("VALIDATION_ERROR", "baseUrl is required for custom provider");
+    if (!(c.baseUrl.startsWith("http://") || c.baseUrl.startsWith("https://")))
+      throw new BuilderError("VALIDATION_ERROR", "custom baseUrl must start with http:// or https://");
+  }
   if (c.agent.maxIterations < 1 || c.agent.maxIterations > 500)
     throw new BuilderError("VALIDATION_ERROR", "agent.maxIterations out of range");
 }
@@ -1020,7 +1028,8 @@ var OpenAICompatibleProvider = class {
           model: this.cfg.model,
           messages: [{ role: "system", content: input.system }, ...input.messages],
           tools: input.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
-          tool_choice: "auto"
+          tool_choice: "auto",
+          stream: false
         })
       });
     } catch (e) {
@@ -1122,6 +1131,12 @@ function createProvider(cfg) {
     return new AnthropicProvider(cfg);
   if (p === "gemini")
     return new GeminiProvider(cfg);
+  if (p === "custom") {
+    if (!cfg.baseUrl || typeof cfg.baseUrl !== "string" || cfg.baseUrl.trim() === "") {
+      throw new BuilderError("VALIDATION_ERROR", "custom provider requires baseUrl (OpenAI-compatible endpoint)");
+    }
+    return new OpenAICompatibleProvider(cfg);
+  }
   return new OpenAICompatibleProvider(cfg);
 }
 var AGENT_SYSTEM_PROMPT = `You are an autonomous senior software engineer operating on the user's project.
@@ -1681,22 +1696,22 @@ async function startRuntime(opts) {
     maxToolCalls: opts.config.agent.maxToolCalls,
     runTimeoutMs: opts.config.agent.runTimeoutMs
   });
-  const port = await findFreePort(opts.config.serverPort, opts.config.host);
+  let port = await findFreePort(opts.config.serverPort, opts.config.host);
   const server = http.createServer(async (req2, res) => {
     try {
-      const url = new URL(req2.url ?? "/", `http://${opts.config.host}:${port}`);
+      const url2 = new URL(req2.url ?? "/", `http://${opts.config.host}:${port}`);
       if (!checkOrigin(req2, opts.config.host, port)) {
         sendJson(res, 403, { error: "FORBIDDEN", message: "Bad origin" });
         return;
       }
       const method = req2.method ?? "GET";
-      const p = url.pathname;
+      const p = url2.pathname;
       if (p === "/api/health" && method === "GET") {
         sendJson(res, 200, { ok: true, version: "0.1.0", project: engine.root, processes: procs.list().length, provider: opts.config.provider, model: opts.config.model });
         return;
       }
       if (p === "/api/models" && method === "GET") {
-        sendJson(res, 200, { provider: opts.config.provider, model: opts.config.model, supported: ["openai", "anthropic", "gemini", "openrouter", "ollama", "llamacpp", "lmstudio"] });
+        sendJson(res, 200, { provider: opts.config.provider, model: opts.config.model, supported: ["openai", "anthropic", "gemini", "openrouter", "ollama", "llamacpp", "lmstudio", "custom"] });
         return;
       }
       if (p === "/api/events" && method === "GET") {
@@ -1754,7 +1769,7 @@ async function startRuntime(opts) {
         return;
       }
       if (p === "/api/file" && method === "GET") {
-        const rel = url.searchParams.get("path") ?? "";
+        const rel = url2.searchParams.get("path") ?? "";
         sendJson(res, 200, { path: rel, content: await engine.readFile(rel) });
         return;
       }
@@ -1777,7 +1792,7 @@ async function startRuntime(opts) {
         return;
       }
       if (p === "/api/file" && method === "DELETE") {
-        const rel = url.searchParams.get("path") ?? "";
+        const rel = url2.searchParams.get("path") ?? "";
         await engine.deleteFile(rel);
         sendJson(res, 200, { ok: true });
         return;
@@ -1809,7 +1824,7 @@ async function startRuntime(opts) {
         return;
       }
       if (p === "/api/process/output" && method === "GET") {
-        sendJson(res, 200, { output: procs.output(url.searchParams.get("id") ?? "") });
+        sendJson(res, 200, { output: procs.output(url2.searchParams.get("id") ?? "") });
         return;
       }
       if (p === "/api/dev/start" && method === "POST") {
@@ -1902,7 +1917,20 @@ async function startRuntime(opts) {
     };
   }
   await new Promise((resolve) => server.listen(port, opts.config.host, resolve));
-  log2.info("runtime listening", { url: `http://${opts.config.host}:${port}` });
+  const addr = server.address();
+  const boundPort = addr && typeof addr === "object" && typeof addr.port === "number" ? addr.port : port;
+  port = boundPort;
+  const url = `http://${opts.config.host}:${boundPort}`;
+  log2.info("runtime listening", { url });
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5e3);
+    const res = await fetch(`${url}/api/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    log2.info("health self-check", { ok: res.ok, url: `${url}/api/health` });
+  } catch (e) {
+    log2.info("health self-check failed (non-fatal)", { error: e.message });
+  }
   const shutdown = async () => {
     procs.stopAll();
     await new Promise((resolve) => server.close(() => resolve()));
@@ -1910,8 +1938,8 @@ async function startRuntime(opts) {
   process.on("SIGINT", () => void shutdown());
   process.on("SIGTERM", () => void shutdown());
   return {
-    port,
-    url: `http://${opts.config.host}:${port}`,
+    port: boundPort,
+    url,
     close: shutdown,
     engine,
     procs,
@@ -1920,7 +1948,7 @@ async function startRuntime(opts) {
 }
 
 // apps/cli/dist/index.js
-var VERSION = "0.1.3";
+var VERSION = "0.1.4";
 function printHelp() {
   console.log(`builder ${VERSION} \u2014 local-first AI web-app builder
 Usage:
