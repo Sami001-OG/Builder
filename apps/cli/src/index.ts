@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { loadConfig, saveConfig, configPath } from '@builder/config';
 import { startRuntime } from '@builder/runtime';
 
-const VERSION = '0.1.2';
+const VERSION = '0.1.3';
 
 function printHelp(): void {
   console.log(`builder ${VERSION} — local-first AI web-app builder
@@ -129,7 +129,7 @@ async function start(noOpen: boolean): Promise<number> {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     path.resolve(here, '../web-dist'),
-    path.resolve(here, '../../apps/web/dist'),
+    path.resolve(here, '../../../apps/web/dist'),
     path.resolve(process.cwd(), 'apps/web/dist'),
   ];
   const webDistDir = candidates.find((d) => fs.existsSync(path.join(d, 'index.html')));
